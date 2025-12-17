@@ -1,0 +1,65 @@
+:root {
+    --bg: #1e1e1e;
+    --panel: #262626;
+    --card: #2d2d2d;
+    --surface: #333333;
+    --border: #3f3f3f;
+
+    --text: #e6e6e6;
+    --text-muted: #b3b3b3;
+    --text-disabled: #7a7a7a;
+    --text-strong: #ffffff;
+
+    --accent: #5aa9e6;
+    --accent-hover: #79bdf0;
+    --accent-active: #3e8ed0;
+
+    --success: #6fcf97;
+    --warning: #f2c94c;
+    --error: #eb5757;
+    --info: #56ccf2;
+}
+
+.root{
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: "Sans";
+}
+
+.top-panel {
+    background-color: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 12px;
+}
+
+button.top-panel-button {
+    background-color: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 0;
+}
+
+button.top-panel-button:hover {
+    background-color: var(--accent-hover);
+    color: #000;
+}
+
+button.top-panel-button:active {
+    background-color: var(--accent-active);
+    color: #000;
+}
+
+label {
+    color: var(--text-muted);
+}
+
+label.title {
+    color: var(--text-strong);
+    font-weight: bold;
+}
+
+separator {
+    background-color: var(--border);
+}
+
