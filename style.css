@@ -1,7 +1,6 @@
 :root {
     --bg: #1e1e1e;
     --panel: #262626;
-    --card: #2d2d2d;
     --surface: #333333;
     --border: #3f3f3f;
 
@@ -32,20 +31,34 @@
     padding: 12px;
 }
 
-button.top-panel-button {
+.bottom-panel {
+    background-color: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 12px;
+}
+
+.text-view {
+    background-color: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin: 12px;
+    padding: 12px;
+}
+
+button {
     background-color: var(--surface);
     color: var(--text);
     border: 1px solid var(--border);
     border-radius: 6px;
-    padding: 8px 0;
+    padding: 8px;
 }
 
-button.top-panel-button:hover {
+button:hover {
     background-color: var(--accent-hover);
     color: #000;
 }
 
-button.top-panel-button:active {
+button {
     background-color: var(--accent-active);
     color: #000;
 }
@@ -58,8 +71,3 @@ label.title {
     color: var(--text-strong);
     font-weight: bold;
 }
-
-separator {
-    background-color: var(--border);
-}
-
