@@ -1,13 +1,16 @@
 #include <gtk/gtk.h>
+#include "parser.c"
 
 #define WINDOW_WIDTH 700
 #define WINDOW_HEIGHT 500
 
 GtkWidget* rootBox;
 GtkWidget* window;
+GtkWidget* rules_box;
 
 #define root_append(widget) gtk_box_append(GTK_BOX(rootBox), widget)
 #define box_append(box, widget) gtk_box_append(GTK_BOX(box), widget)
+
 
 void load_css(){
     GtkCssProvider *provider = gtk_css_provider_new();
@@ -47,11 +50,8 @@ void populate_top_panel(){
     GtkWidget *outputButton = gtk_button_new_with_label("output");
     GtkWidget *forwardButton = gtk_button_new_with_label("forward");
 
-    gtk_widget_add_css_class(inputButton, "top-panel-button");
     gtk_widget_set_hexpand(inputButton, TRUE);
-    gtk_widget_add_css_class(outputButton, "top-panel-button");
     gtk_widget_set_hexpand(outputButton, TRUE);
-    gtk_widget_add_css_class(forwardButton, "top-panel-button");
     gtk_widget_set_hexpand(forwardButton, TRUE);
 
     box_append(button_row, inputButton);
@@ -60,6 +60,61 @@ void populate_top_panel(){
 
     box_append(topPanel, label_row);
     box_append(topPanel, button_row);
+}
+
+void box_clear_children(GtkWidget *parent){
+    if (!parent) {
+        LOG("NULL parent!");
+        exit(1);
+    }
+
+    GtkWidget* cur;
+    GtkWidget* next;
+    cur = gtk_widget_get_first_child(parent);
+    while (cur) {
+        next = gtk_widget_get_next_sibling(cur);
+        gtk_box_remove(GTK_BOX(parent), cur);
+        cur = next;
+    }
+}
+
+void load_rules(){
+    Rules rules = {0};
+    sudo_cmd("iptables -L INPUT -vn --line-numbers > tables.tmp");
+    box_clear_children(rules_box); // Clear the box
+    if (!parse_rules_from_file("tables.tmp", &rules)){
+        for (int i = 0;  i < rules.count; i++) {
+            GtkWidget *label;
+            // TODO: change label widget
+            label = gtk_label_new(rules.items[i].dst);
+            box_append(rules_box, label);
+        }
+    }
+}
+
+void populate_rule_listing_box(){
+    rules_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
+    gtk_widget_add_css_class(rules_box, "rules-box");
+
+    // TODO: Load the rules, add to the rules_box
+    load_rules();
+    root_append(rules_box);
+}
+
+void populate_bottom_panel(){
+    // Buttons
+    GtkWidget *panel = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
+    gtk_widget_add_css_class(panel, "bottom-panel");
+
+    GtkWidget *add_rule_btn = gtk_button_new_with_label("Add Rule +");
+    GtkWidget *refresh_btn = gtk_button_new_with_label("Refresh 🗘");
+    
+    g_signal_connect(GTK_BUTTON(refresh_btn), "clicked", G_CALLBACK(load_rules), NULL);
+
+    box_append(panel, add_rule_btn);
+    box_append(panel, refresh_btn);
+
+    root_append(panel);
 }
 
 void activate(GtkApplication*app, gpointer user_data){
@@ -75,21 +130,13 @@ void activate(GtkApplication*app, gpointer user_data){
     gtk_window_set_child(GTK_WINDOW(window), rootBox);
 
     populate_top_panel();
+    populate_rule_listing_box();
+    populate_bottom_panel();
 
     load_css();
 
     gtk_window_present(GTK_WINDOW(window));
 }
-
-#define do_cmd(cmd)\
-    do{\
-        if(system(cmd)){\
-            fprintf(stderr, "do_cmd");\
-            return 1;\
-        }\
-    }while(0)
-
-#define sudo_cmd(cmd) do_cmd("sudo " cmd)
 
 int main(int argc, char **argv) {
     GtkApplication* app;
