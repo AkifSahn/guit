@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #define LOG(msg) fprintf(stderr, msg "\n")
 
 #define do_cmd(cmd)\
@@ -86,6 +87,7 @@ static void parse_rule_from_line(char* line, Rules* rules){
 
             buffer[buff_i] = '\0';
             buff_i = 0;
+            // TODO: fix memory leak, the tmp is never getting freed for most of the cases
             char *tmp = (char*)malloc(strlen(buffer));
             strcpy(tmp, buffer);
             switch (word_count++) {

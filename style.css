@@ -31,6 +31,18 @@
     padding: 12px;
 }
 
+.rules-box{
+    padding: 12px;
+}
+
+.rule-box{
+    padding: 5px 0px 5px 0px;
+}
+
+.rule-box:hover{
+    background-color: var(--panel);
+}
+
 .bottom-panel {
     background-color: var(--panel);
     border-bottom: 1px solid var(--border);
@@ -55,11 +67,6 @@ button {
 
 button:hover {
     background-color: var(--accent-hover);
-    color: #000;
-}
-
-button {
-    background-color: var(--accent-active);
     color: #000;
 }
 
