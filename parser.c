@@ -1,52 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "parser.h"
 
-#define LOG(msg) fprintf(stderr, msg "\n")
 
-#define do_cmd(cmd)\
-    do{\
-        if(system(cmd)){\
-            fprintf(stderr, "do_cmd");\
-            abort();\
-        }\
-    }while(0)
-
-#define sudo_cmd(cmd) do_cmd("sudo " cmd)
-
-#define da_append(da, x)\
-    do{\
-        if(da.count >= da.capacity){\
-            if (da.capacity == 0) da.capacity = 256;\
-            else da.capacity *= 2;\
-            da.items = realloc(da.items, da.capacity*sizeof(*da.items));\
-        }\
-        da.items[da.count++] = x;\
-    }while(0)
-
-typedef struct{
-    int num;
-    int pkts;
-    char* prot;
-
-    char* target;
-    char* src;
-    char* dst;
-
-    int sport;
-    int dport;
-}Rule;
-
-typedef struct{
-    Rule *items;
-    size_t count;
-    size_t capacity;
-}Rules;
-
-static int parse_rules_from_file(char* filename, Rules* rules);
+// Forward declerations
 static void parse_rule_from_line(char* line, Rules* rules);
 
-static int parse_rules_from_file(char* filename, Rules* rules){
+int parse_rules_from_file(char* filename, Rules* rules){
     FILE* f = fopen(filename, "r");
     if (!f) {
         return 1;
@@ -88,8 +49,7 @@ static void parse_rule_from_line(char* line, Rules* rules){
             buffer[buff_i] = '\0';
             buff_i = 0;
             // TODO: fix memory leak, the tmp is never getting freed for most of the cases
-            char *tmp = (char*)malloc(strlen(buffer));
-            strcpy(tmp, buffer);
+            char *tmp = strdup(buffer);
             switch (word_count++) {
                 case 0:
                     rule.num = atoi(tmp);
