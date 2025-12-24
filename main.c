@@ -224,6 +224,7 @@ void load_rules(){
             box_append(rules_box, make_rule_box(rules.items[i]));
         }
     }
+    da_free(rules);
 }
 
 

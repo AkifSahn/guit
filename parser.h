@@ -46,6 +46,11 @@ typedef struct{
         da.items[da.count++] = x;\
     }while(0)
 
+#define da_free(da)\
+    do{\
+        free(da.items);\
+    }while(0)\
+
 
 int parse_rules_from_file(char* filename, Rules* rules);
 
