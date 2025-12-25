@@ -111,14 +111,14 @@ void populate_bottom_panel(){
     GtkWidget *panel = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
     gtk_widget_add_css_class(panel, "bottom-panel");
 
-    GtkWidget *add_rule_btn = gtk_button_new_with_label("Add Rule +");
-    GtkWidget *refresh_btn = gtk_button_new_with_label("Refresh 🗘");
+    GtkWidget *w_add_rule = gtk_button_new_with_label("Add Rule +");
+    GtkWidget *w_refresh = gtk_button_new_with_label("Refresh 🗘");
     
-    g_signal_connect(GTK_BUTTON(refresh_btn), "clicked", G_CALLBACK(load_rules), NULL);
-    // g_signal_connect(GTK_BUTTON(add_rule_btn), "clicked", G_CALLBACK(popup_add_rule), NULL);
+    g_signal_connect(GTK_BUTTON(w_refresh), "clicked", G_CALLBACK(load_rules), NULL);
+    // g_signal_connect(GTK_BUTTON(w_add_rule), "clicked", G_CALLBACK(popup_add_rule), NULL);
 
-    box_append(panel, add_rule_btn);
-    box_append(panel, refresh_btn);
+    box_append(panel, w_add_rule);
+    box_append(panel, w_refresh);
 
     root_append(panel);
 }
@@ -220,7 +220,7 @@ void load_rules(){
     box_clear_children(rules_box); // Clear the box
     box_append(rules_box, make_rules_info_header());
     if (!parse_rules_from_file("tables.tmp", &rules)){
-        for (int i = 0;  i < rules.count; i++) {
+        for (size_t i = 0;  i < rules.count; i++) {
             box_append(rules_box, make_rule_box(rules.items[i]));
         }
     }
@@ -228,7 +228,7 @@ void load_rules(){
 }
 
 
-void activate(GtkApplication* app, gpointer user_data){
+void activate(GtkApplication* app){ // , gpointer user_data){
 
     window = gtk_application_window_new(app);
     gtk_window_set_title(GTK_WINDOW(window), "iptables");

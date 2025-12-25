@@ -1,11 +1,145 @@
+#include <assert.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "parser.h"
 
+#define MAX_TOKEN_LEN 124
 
-// Forward declerations
-static void parse_rule_from_line(char* line, Rules* rules);
+// Enum members are ordered in token appearance order in:
+// 'iptables -L INPUT -nv --line-numbers'
+typedef enum{
+    TOKEN_NUM,
+    TOKEN_PKTS,
+    TOKEN_BYTES,
+    TOKEN_TARGET,
+    TOKEN_PROT,
+    TOKEN_OPT,
+    TOKEN_IN,
+    TOKEN_OUT,
+    TOKEN_SRC,
+    TOKEN_DST,
+    TOKEN_MODULE, // Can be comment, tcp, udp etc
+    TOKEN_MODULE_1, // dport:<port>, sport:<port> or flags:<flags>
+    TOKEN_MODULE_2, 
+    TOKEN_MODULE_3,
+}Token_Type;
+
+typedef struct{
+    char str[MAX_TOKEN_LEN];
+    Token_Type type;
+}Token;
+
+
+static char** split_str(const char* str, char delim, size_t* num_tokens){
+    size_t str_len = strlen(str);
+    int token_count = 0;
+    char c_prev, c = '\0';
+
+    // 1st pass, count tokens
+    for (size_t i = 0; i <= str_len; ++i) {
+        c = str[i];
+        if (c == delim || c == '\0') {
+            if (c_prev != '\0' && c_prev != ' ') {
+                token_count++;
+            }
+        }
+        c_prev = c;
+    }
+
+    char** arr = malloc((token_count)*(sizeof(char*)));
+
+    int i = 0;
+    char* copy = strdup(str);
+    char* token = strtok(copy, &delim);
+    // 2nd pass, fill the arr
+    while (token != NULL) {
+        arr[i++] = strdup(token);
+        token = strtok(NULL, &delim);
+    }
+
+    *num_tokens = token_count;
+    free(copy);
+    return arr;
+}
+
+static bool str_has_prefix(const char* str, const char* prefix){
+    size_t len_str = strlen(str);
+    size_t len_prefix = strlen(prefix);
+
+    if (len_str < len_prefix) return false;
+
+    for (size_t i = 0; i < len_prefix; ++i) {
+        if (str[i] != prefix[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static int parse_rule_from_line(char* line, Rules* rules){
+    if (str_has_prefix(line, "Chain") || str_has_prefix(line, "num")) {
+        return 0;
+    }
+
+    size_t num_tokens;
+    char** tokens = split_str(line, ' ', &num_tokens);
+
+    Rule rule = {0};
+    const char* token;
+    for (size_t i = 0; i < num_tokens; ++i) {
+        token = tokens[i];
+        switch (i) {
+        case TOKEN_NUM:
+            rule.num = atoi(token);
+            break;
+        case TOKEN_PKTS:
+            rule.pkts = atoi(token);
+            break;
+        case TOKEN_BYTES:
+            break;
+        case TOKEN_TARGET:
+            rule.target = strdup(token);
+            break;
+        case TOKEN_PROT:
+            rule.prot = strdup(token);
+            break;
+        case TOKEN_OPT:
+            break;
+        case TOKEN_IN:
+            break;
+        case TOKEN_OUT:
+            break;
+        case TOKEN_SRC:
+            rule.src = strdup(token);
+            break;
+        case TOKEN_DST:
+            rule.dst = strdup(token);
+            break;
+        case TOKEN_MODULE:
+            break;
+        case TOKEN_MODULE_1:
+            break;
+        case TOKEN_MODULE_2: 
+            break;
+        case TOKEN_MODULE_3:
+            break;
+        default:
+            // assert(0 || "parse_rule_from_line: Token Type not supported");
+            fprintf(stderr, "unsupported token: '%s'\n", token);
+            return 1;
+        }
+    }
+
+    for (size_t i = 0; i < num_tokens; ++i) {
+        free(tokens[i]);
+    }
+    free(tokens);
+    da_append((*rules), rule);
+    return 0;
+}
 
 int parse_rules_from_file(char* filename, Rules* rules){
     FILE* f = fopen(filename, "r");
@@ -28,56 +162,4 @@ int parse_rules_from_file(char* filename, Rules* rules){
     }
 
     return 0;
-}
-
-static void parse_rule_from_line(char* line, Rules* rules){
-
-    if (!(line[0] >= '0' && line[0] <= '9')) {
-        return;
-    }
-    // Expected format of a line
-    // <num> <pkts> <bytes> <target> <prot> <opt> <in> <out> <src> <dst> <sip:num> <dip:num>
-
-    Rule rule = {0};
-    char buffer[256], c = 0;
-    int line_i = 0, buff_i = 0, word_count = 0;
-    while (line[line_i+1] != '\0') {
-        c = line[line_i++];
-        if (c == ' ') {
-            if (buff_i == 0) continue; // no word in the buffer
-
-            buffer[buff_i] = '\0';
-            buff_i = 0;
-            // TODO: fix memory leak, the tmp is never getting freed for most of the cases
-            char *tmp = strdup(buffer);
-            switch (word_count++) {
-                case 0:
-                    rule.num = atoi(tmp);
-                    free(tmp);
-                    break;
-                case 1:
-                    rule.pkts = atoi(tmp);
-                    free(tmp);
-                    break;
-                case 2:
-                    break;
-                case 3:
-                    rule.target = tmp;
-                    break;
-                case 4:
-                    rule.prot = tmp;
-                    break;
-                case 8:
-                    rule.src = tmp;
-                    break;
-                case 9:
-                    rule.dst = tmp;
-                    break;
-            }
-            continue;
-        }
-        buffer[buff_i++] = c;
-    }
-
-    da_append((*rules), rule);
 }
