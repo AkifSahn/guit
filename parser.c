@@ -79,6 +79,19 @@ static bool str_has_prefix(const char* str, const char* prefix){
     return true;
 }
 
+static char* protos[] = {
+    "tcp", "udp", "udplite", "icmp", "icmpv6",
+    "esp", "ah", "sctp", "mh", "all"
+};
+
+static bool is_valid_protocol(const char* proto_str){
+    for (size_t i = 0; i < sizeof(protos)/sizeof(protos[0]); ++i) {
+        if (!strcmp(protos[i], proto_str)) return true;
+    }
+    return false;
+}
+
+
 static int parse_rule_from_line(char* line, Rules* rules){
     if (str_has_prefix(line, "Chain") || str_has_prefix(line, "num")) {
         return 0;
@@ -89,9 +102,9 @@ static int parse_rule_from_line(char* line, Rules* rules){
 
     Rule rule = {0};
     const char* token;
-    for (size_t i = 0; i < num_tokens; ++i) {
+    for (size_t i = 0, tok_type = TOKEN_NUM; i < num_tokens; ++i, ++tok_type) {
         token = tokens[i];
-        switch (i) {
+        switch (tok_type) {
         case TOKEN_NUM:
             rule.num = atoi(token);
             break;
@@ -101,6 +114,12 @@ static int parse_rule_from_line(char* line, Rules* rules){
         case TOKEN_BYTES:
             break;
         case TOKEN_TARGET:
+            // Target may be empty, but protocol can not. Check if token is protocol.
+            if (is_valid_protocol(token)) {
+                rule.prot = strdup(token);
+                tok_type = TOKEN_PROT;
+                continue;
+            }
             rule.target = strdup(token);
             break;
         case TOKEN_PROT:
