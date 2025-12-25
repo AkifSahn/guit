@@ -20,6 +20,8 @@ static GtkSizeGroup* sg_prot;
 static GtkSizeGroup* sg_target;
 static GtkSizeGroup* sg_src;
 static GtkSizeGroup* sg_dst;
+static GtkSizeGroup* sg_spt;
+static GtkSizeGroup* sg_dpt;
 
 void load_rules();
 void init_rules_box_size_groups();
@@ -131,10 +133,12 @@ void init_rules_box_size_groups(){
     sg_target = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
     sg_src = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
     sg_dst = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
+    sg_spt = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
+    sg_dpt = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
 }
 
 GtkWidget* make_rules_info_header(){
-    GtkWidget *w_num, *w_pkts, *w_prot, *w_target, *w_src, *w_dst;
+    GtkWidget *w_num, *w_pkts, *w_prot, *w_target, *w_src, *w_dst, *w_spt, *w_dpt;
     GtkWidget* box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
 
     w_num = gtk_label_new("num");
@@ -144,6 +148,8 @@ GtkWidget* make_rules_info_header(){
     w_target = gtk_label_new("target");
     w_src = gtk_label_new("src");
     w_dst = gtk_label_new("dst");
+    w_spt = gtk_label_new("spt");
+    w_dpt = gtk_label_new("dpt");
 
     // gtk_widget_set_hexpand(w_num, TRUE);
     gtk_widget_set_hexpand(w_pkts, TRUE);
@@ -151,6 +157,8 @@ GtkWidget* make_rules_info_header(){
     gtk_widget_set_hexpand(w_target, TRUE);
     gtk_widget_set_hexpand(w_src, TRUE);
     gtk_widget_set_hexpand(w_dst, TRUE);
+    gtk_widget_set_hexpand(w_spt, TRUE);
+    gtk_widget_set_hexpand(w_dpt, TRUE);
 
     gtk_size_group_add_widget(sg_num, w_num);
     gtk_size_group_add_widget(sg_pkts, w_pkts);
@@ -158,6 +166,8 @@ GtkWidget* make_rules_info_header(){
     gtk_size_group_add_widget(sg_target, w_target);
     gtk_size_group_add_widget(sg_src, w_src);
     gtk_size_group_add_widget(sg_dst, w_dst);
+    gtk_size_group_add_widget(sg_spt, w_spt);
+    gtk_size_group_add_widget(sg_dpt, w_dpt);
 
     box_append(box, w_num);
     box_append(box, w_pkts);
@@ -165,12 +175,14 @@ GtkWidget* make_rules_info_header(){
     box_append(box, w_target);
     box_append(box, w_src);
     box_append(box, w_dst);
+    box_append(box, w_spt);
+    box_append(box, w_dpt);
 
     return box;
 }
 
 GtkWidget* make_rule_box(const Rule rule){
-    GtkWidget *w_num, *w_pkts, *w_prot, *w_target, *w_src, *w_dst, *w_separator;
+    GtkWidget *w_num, *w_pkts, *w_prot, *w_target, *w_src, *w_dst, *w_spt, *w_dpt, *w_separator;
     GtkWidget* box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     gtk_widget_add_css_class(box, "rule-box");
 
@@ -186,6 +198,11 @@ GtkWidget* make_rule_box(const Rule rule){
     w_src = gtk_label_new(rule.src);
     w_dst = gtk_label_new(rule.dst);
 
+    snprintf(str_buffer, sizeof(str_buffer), "%d", rule.sport);
+    w_spt = gtk_label_new(rule.sport >= 0 ? str_buffer : NULL);
+    snprintf(str_buffer, sizeof(str_buffer), "%d",rule.dport);
+    w_dpt = gtk_label_new(rule.dport >= 0 ? str_buffer : NULL);
+
     w_separator = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
 
     // gtk_widget_set_hexpand(w_num, TRUE);
@@ -194,6 +211,8 @@ GtkWidget* make_rule_box(const Rule rule){
     gtk_widget_set_hexpand(w_target, TRUE);
     gtk_widget_set_hexpand(w_src, TRUE);
     gtk_widget_set_hexpand(w_dst, TRUE);
+    gtk_widget_set_hexpand(w_spt, TRUE);
+    gtk_widget_set_hexpand(w_dpt, TRUE);
 
     gtk_size_group_add_widget(sg_num, w_num);
     gtk_size_group_add_widget(sg_pkts, w_pkts);
@@ -201,6 +220,8 @@ GtkWidget* make_rule_box(const Rule rule){
     gtk_size_group_add_widget(sg_target, w_target);
     gtk_size_group_add_widget(sg_src, w_src);
     gtk_size_group_add_widget(sg_dst, w_dst);
+    gtk_size_group_add_widget(sg_spt, w_spt);
+    gtk_size_group_add_widget(sg_dpt, w_dpt);
 
     box_append(box, w_num);
     box_append(box, w_pkts);
@@ -208,6 +229,8 @@ GtkWidget* make_rule_box(const Rule rule){
     box_append(box, w_target);
     box_append(box, w_src);
     box_append(box, w_dst);
+    box_append(box, w_spt);
+    box_append(box, w_dpt);
 
     box_append(rules_box, w_separator);
 
