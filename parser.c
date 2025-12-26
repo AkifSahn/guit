@@ -5,8 +5,6 @@
 #include <string.h>
 #include "parser.h"
 
-#define MAX_TOKEN_LEN 124
-
 // Enum members are ordered in token appearance order in:
 // 'iptables -L INPUT -nv --line-numbers'
 typedef enum{
@@ -25,12 +23,6 @@ typedef enum{
     TOKEN_MODULE_2, 
     TOKEN_MODULE_3,
 }Token_Type;
-
-typedef struct{
-    char str[MAX_TOKEN_LEN];
-    Token_Type type;
-}Token;
-
 
 static char** split_str(const char* str, char delim, size_t* num_tokens){
     size_t str_len = strlen(str);
