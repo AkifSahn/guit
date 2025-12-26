@@ -1,12 +1,12 @@
 .PHONY: all
-all: build/app
+all: build/guit
 
-build/app:src/main.c src/parser.c src/parser.h
-	gcc -o build/app src/main.c src/parser.c -Wall -Wextra `pkg-config --cflags --libs gtk4`
+build/guit:src/guit.c src/parser.c src/parser.h src/ui.h
+	gcc -o build/guit src/guit.c src/parser.c src/ui.c -Wall -Wextra `pkg-config --cflags --libs gtk4`
 
 .PHONY: debug
-debug:src/main.c src/parser.c src/parser.h
-	gcc -g src/main.c src/parser.c -o build/app -Wall -Wextra `pkg-config --cflags --libs gtk4`
+debug:src/guit.c src/parser.c src/parser.h src/ui.h
+	gcc -o build/guit -g src/guit.c src/parser.c src/ui.c -Wall -Wextra `pkg-config --cflags --libs gtk4`
 
 .PHONY: clean
 clean:

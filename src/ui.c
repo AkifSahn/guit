@@ -1,17 +1,4 @@
-#include <gtk/gtk.h>
-#include <stdlib.h>
-
-#include "parser.h"
-
-#define MAX_PORT_ALLOWED 65535
-
-#define WINDOW_WIDTH 700
-#define WINDOW_HEIGHT 500
-
-#define root_append(widget) gtk_box_append(GTK_BOX(rootBox), widget)
-#define box_append(box, widget) gtk_box_append(GTK_BOX(box), widget)
-
-#define entry_get_text(entry) gtk_entry_buffer_get_text(gtk_entry_get_buffer(entry))
+#include "ui.h"
 
 // Global variables
 static GtkWidget* rootBox;
@@ -27,11 +14,24 @@ static GtkSizeGroup* sg_dst;
 static GtkSizeGroup* sg_spt;
 static GtkSizeGroup* sg_dpt;
 
+#define INPUT_POPUP_WIDTH 900
+#define INPUT_POPUP_HEIGHT 200
+
+typedef struct{
+    GtkWidget *window;
+    GtkWidget *sb_num;
+    GtkWidget *dd_prot;
+    GtkWidget *dd_target;
+    GtkWidget *e_src;
+    GtkWidget *e_dst;
+    GtkWidget *sb_spt;
+    GtkWidget *sb_dpt;
+}InputWidgets;
+
+static const char* dd_prot_options[] = {"all", "tcp", "udp", NULL};
+static const char* dd_target_options[] = {"ACCEPT", "REJECT", "DROP", NULL};
 
 Rules rules = {0};
-
-void load_rules();
-void init_rules_box_size_groups();
 
 void load_css(){
     GtkCssProvider *provider = gtk_css_provider_new();
@@ -45,6 +45,17 @@ void load_css(){
             GTK_STYLE_PROVIDER(provider),
             GTK_STYLE_PROVIDER_PRIORITY_APPLICATION
             );
+}
+
+void init_rules_box_size_groups(){
+    sg_num = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
+    sg_pkts = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
+    sg_prot = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
+    sg_target = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
+    sg_src = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
+    sg_dst = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
+    sg_spt = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
+    sg_dpt = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
 }
 
 void box_clear_children(GtkWidget *parent){
@@ -111,26 +122,9 @@ void populate_rule_listing_box(){
     gtk_widget_set_vexpand(scrolled_window, TRUE);
 
     init_rules_box_size_groups();
-    load_rules();
+    ui_load_rules();
     root_append(scrolled_window);
 }
-
-#define INPUT_POPUP_WIDTH 900
-#define INPUT_POPUP_HEIGHT 200
-
-typedef struct{
-    GtkWidget *window;
-    GtkWidget *sb_num;
-    GtkWidget *dd_prot;
-    GtkWidget *dd_target;
-    GtkWidget *e_src;
-    GtkWidget *e_dst;
-    GtkWidget *sb_spt;
-    GtkWidget *sb_dpt;
-}InputWidgets;
-
-static const char* dd_prot_options[] = {"all", "tcp", "udp", NULL};
-static const char* dd_target_options[] = {"ACCEPT", "REJECT", "DROP", NULL};
 
 void query_new_rule(GtkButton* btn, void* data){
     InputWidgets widgets = *(InputWidgets*)data;
@@ -195,7 +189,7 @@ void query_new_rule(GtkButton* btn, void* data){
         printf("Executing command: `%s`\n", cmd);
         sudo_cmd(cmd);
         gtk_window_destroy(GTK_WINDOW(widgets.window));
-        load_rules();
+        ui_load_rules();
     }
 }
 
@@ -339,25 +333,13 @@ void populate_bottom_panel(){
     GtkWidget *w_add_rule = gtk_button_new_with_label("Add Rule +");
     GtkWidget *w_refresh = gtk_button_new_with_label("Refresh 🗘");
     
-    g_signal_connect(GTK_BUTTON(w_refresh), "clicked", G_CALLBACK(load_rules), NULL);
+    g_signal_connect(GTK_BUTTON(w_refresh), "clicked", G_CALLBACK(ui_load_rules), NULL);
     g_signal_connect(GTK_BUTTON(w_add_rule), "clicked", G_CALLBACK(popup_add_rule), NULL);
 
     box_append(panel, w_add_rule);
     box_append(panel, w_refresh);
 
     root_append(panel);
-}
-
-
-void init_rules_box_size_groups(){
-    sg_num = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
-    sg_pkts = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
-    sg_prot = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
-    sg_target = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
-    sg_src = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
-    sg_dst = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
-    sg_spt = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
-    sg_dpt = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
 }
 
 GtkWidget* make_rules_info_header(){
@@ -461,7 +443,7 @@ GtkWidget* make_rule_box(const Rule rule){
 }
 
 
-void load_rules(){
+void ui_load_rules(){
     sudo_cmd("iptables -L INPUT -vn --line-numbers > tables.tmp");
 
     box_clear_children(rules_box);
@@ -477,7 +459,7 @@ void load_rules(){
     // da_free(rules);
 }
 
-void activate(GtkApplication* app){ // , gpointer user_data){
+void ui_activate(GtkApplication* app){
     window = gtk_application_window_new(app);
     gtk_window_set_title(GTK_WINDOW(window), "iptables");
     gtk_window_set_default_size(GTK_WINDOW(window), WINDOW_WIDTH, WINDOW_HEIGHT);
@@ -495,16 +477,4 @@ void activate(GtkApplication* app){ // , gpointer user_data){
     load_css();
 
     gtk_window_present(GTK_WINDOW(window));
-}
-
-int main(int argc, char **argv) {
-    GtkApplication* app;
-    int status;
-
-    app = gtk_application_new("gui.iptables", G_APPLICATION_DEFAULT_FLAGS);
-    g_signal_connect(app, "activate", G_CALLBACK (activate), NULL);
-    status = g_application_run(G_APPLICATION(app), argc, argv);
-    g_object_unref (app);
-    
-    return status;
 }
