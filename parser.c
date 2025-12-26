@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <ctype.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -68,6 +69,31 @@ static bool str_has_prefix(const char* str, const char* prefix){
     return true;
 }
 
+void trim_whitespace(char* str){
+    char *start = str;
+    char *end;
+
+    while (*start && isspace((unsigned char)*start)) {
+        start++;
+    }
+
+    if (*start == '\0') {
+        str[0] = '\0';
+        return;
+    }
+
+    end = start + strlen(start) - 1;
+    while (end > start && isspace((unsigned char)*end)) {
+        end--;
+    }
+
+    *(end + 1) = '\0';
+
+    if (start != str) {
+        memmove(str, start, (end - start + 2));
+    }
+}
+
 static char* protos[] = {
     "tcp", "udp", "udplite", "icmp", "icmpv6",
     "esp", "ah", "sctp", "mh", "all"
@@ -77,6 +103,49 @@ static bool is_valid_protocol(const char* proto_str){
     for (size_t i = 0; i < sizeof(protos)/sizeof(protos[0]); ++i) {
         if (!strcmp(protos[i], proto_str)) return true;
     }
+    return false;
+}
+
+bool is_valid_ipv4_or_cidr(const char* s){
+    const char* p = s;
+    int octet = 0, octet_count = 0, digit_count = 0;
+
+    // Parse 4 octets
+    for (;;) {
+        octet = 0;
+        digit_count = 0;
+        while (isdigit(*p)) {
+            octet = octet*10 + (*p - '0');
+            digit_count++;
+            p++;
+            if (digit_count == 3) break;
+        }
+
+        if (octet < 0 || octet > 255) return false;
+        octet_count++;
+
+        if (octet_count == 4) break;
+        if (*p != '.') return false;
+        p++;
+    }
+
+    // We are done, or '/'
+    if (*p == '\0') return true;
+    if (*p != '/') return false;
+    p++;
+
+    int val = 0;
+    digit_count = 0;
+    while (isdigit(*p)) {
+        val = val*10 + (*p - '0');
+        p++;
+        digit_count++;
+        if (digit_count == 2) break;
+    }
+    
+    if (*p != '\0') return false;
+    if (val >= 0 && val <= 32) return true;
+
     return false;
 }
 

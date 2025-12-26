@@ -30,11 +30,15 @@ typedef struct{
     do{\
         if(system(cmd)){\
             fprintf(stderr, "do_cmd");\
-            abort();\
         }\
     }while(0)
 
-#define sudo_cmd(cmd) do_cmd("sudo " cmd)
+#define sudo_cmd(cmd)\
+    do{\
+        char _buf[1024];\
+        snprintf(_buf, sizeof(_buf), "sudo %s", cmd);\
+        do_cmd(_buf);\
+    }while(0)
 
 #define da_append(da, x)\
     do{\
@@ -53,5 +57,7 @@ typedef struct{
 
 
 int parse_rules_from_file(char* filename, Rules* rules);
+void trim_whitespace(char* str);
+bool is_valid_ipv4_or_cidr(const char* s);
 
 #endif /* ifndef PARSER_H */

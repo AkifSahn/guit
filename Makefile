@@ -3,7 +3,7 @@ build/app:main.c parser.c
 
 .PHONY: debug
 debug:main.c parser.c
-	gcc -g main.c parser.c -o build/app.g -Wall -Wextra `pkg-config --cflags --libs gtk4`
+	gcc -g main.c parser.c -o build/app -Wall -Wextra `pkg-config --cflags --libs gtk4`
 
 .PHONY: clean
 clean:

@@ -3,11 +3,15 @@
 
 #include "parser.h"
 
+#define MAX_PORT_ALLOWED 65535
+
 #define WINDOW_WIDTH 700
 #define WINDOW_HEIGHT 500
 
 #define root_append(widget) gtk_box_append(GTK_BOX(rootBox), widget)
 #define box_append(box, widget) gtk_box_append(GTK_BOX(box), widget)
+
+#define entry_get_text(entry) gtk_entry_buffer_get_text(gtk_entry_get_buffer(entry))
 
 // Global variables
 static GtkWidget* rootBox;
@@ -22,6 +26,9 @@ static GtkSizeGroup* sg_src;
 static GtkSizeGroup* sg_dst;
 static GtkSizeGroup* sg_spt;
 static GtkSizeGroup* sg_dpt;
+
+
+Rules rules = {0};
 
 void load_rules();
 void init_rules_box_size_groups();
@@ -108,6 +115,222 @@ void populate_rule_listing_box(){
     root_append(scrolled_window);
 }
 
+#define INPUT_POPUP_WIDTH 900
+#define INPUT_POPUP_HEIGHT 200
+
+typedef struct{
+    GtkWidget *window;
+    GtkWidget *sb_num;
+    GtkWidget *dd_prot;
+    GtkWidget *dd_target;
+    GtkWidget *e_src;
+    GtkWidget *e_dst;
+    GtkWidget *sb_spt;
+    GtkWidget *sb_dpt;
+}InputWidgets;
+
+static const char* dd_prot_options[] = {"all", "tcp", "udp", NULL};
+static const char* dd_target_options[] = {"ACCEPT", "REJECT", "DROP", NULL};
+
+void query_new_rule(GtkButton* btn, void* data){
+    InputWidgets widgets = *(InputWidgets*)data;
+
+    bool run_cmd = true;
+    int num, spt, dpt;
+    const char *prot, *target, *src, *dst;
+
+    num = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(widgets.sb_num));
+    spt = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(widgets.sb_spt));
+    dpt = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(widgets.sb_dpt));
+
+    int sel;
+    sel = gtk_drop_down_get_selected(GTK_DROP_DOWN(widgets.dd_prot));
+    prot = dd_prot_options[sel];
+    sel = gtk_drop_down_get_selected(GTK_DROP_DOWN(widgets.dd_target));
+    target = dd_target_options[sel];
+
+    src = entry_get_text(GTK_ENTRY(widgets.e_src));
+    dst = entry_get_text(GTK_ENTRY(widgets.e_dst));
+
+    char cmd[1024];
+    int i = 0;
+    i += sprintf(cmd+i, "iptables -I INPUT %d -p %s -j %s", num, prot, target);
+
+    if (strcmp(src, "")){
+        char* src_copy = strdup(src);
+        trim_whitespace(src_copy);
+
+        if (gtk_widget_has_css_class(widgets.e_src, "error-entry"))
+            gtk_widget_remove_css_class(widgets.e_src, "error-entry");
+
+        if (!is_valid_ipv4_or_cidr(src_copy)) {
+            run_cmd = false;
+            gtk_widget_add_css_class(widgets.e_src, "error-entry");
+        }
+
+        i += sprintf(cmd+i, " -s %s", src_copy);
+        free(src_copy);
+    }
+
+    if (strcmp(dst, "")){
+        char* dst_copy = strdup(dst);
+        trim_whitespace(dst_copy);
+
+        if (gtk_widget_has_css_class(widgets.e_dst, "error-entry"))
+            gtk_widget_remove_css_class(widgets.e_dst, "error-entry");
+
+        if (!is_valid_ipv4_or_cidr(dst_copy)) {
+            run_cmd = false;
+            gtk_widget_add_css_class(widgets.e_dst, "error-entry");
+        }
+
+        i += sprintf(cmd+i, " -d %s", dst_copy);
+        free(dst_copy);
+    }
+
+    if (spt >= 0) i += sprintf(cmd+i, " --sport %d", spt);
+    if (dpt >= 0) i += sprintf(cmd+i, " --dport %d", dpt);
+
+    if (run_cmd){
+        printf("Executing command: `%s`\n", cmd);
+        sudo_cmd(cmd);
+        gtk_window_destroy(GTK_WINDOW(widgets.window));
+        load_rules();
+    }
+}
+
+void popup_add_rule(){
+    GtkWidget* window = gtk_window_new();
+    gtk_window_set_resizable(GTK_WINDOW(window), false);
+    gtk_window_set_default_size(GTK_WINDOW(window), INPUT_POPUP_WIDTH, INPUT_POPUP_HEIGHT);
+
+    GtkWidget *root_box, *input_box, *label_box;
+    root_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_widget_set_halign(root_box, GTK_ALIGN_CENTER);
+    gtk_widget_set_hexpand(rootBox, TRUE);
+    gtk_widget_add_css_class(window, "root");
+    gtk_window_set_child(GTK_WINDOW(window), root_box);
+
+
+    GtkSizeGroup* sg_num = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
+    GtkSizeGroup* sg_prot = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
+    GtkSizeGroup* sg_target = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
+    GtkSizeGroup* sg_src = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
+    GtkSizeGroup* sg_dst = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
+    GtkSizeGroup* sg_spt = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
+    GtkSizeGroup* sg_dpt = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
+
+    // Label Box
+    {
+        GtkWidget *l_num, *l_prot, *l_target, *l_src,
+                  *l_dst, *l_spt, *l_dpt, *l_submit, *w_separator;
+
+        label_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
+        gtk_widget_add_css_class(label_box, "popup-label-box");
+
+        l_num = gtk_label_new("num");
+        l_prot = gtk_label_new("prot");
+        l_target = gtk_label_new("target");
+        l_src = gtk_label_new("src");
+        l_dst = gtk_label_new("dst");
+        l_spt = gtk_label_new("spt");
+        l_dpt = gtk_label_new("dpt");
+        w_separator = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+
+        gtk_size_group_add_widget(sg_num, l_num);
+        gtk_size_group_add_widget(sg_prot, l_prot);
+        gtk_size_group_add_widget(sg_target, l_target);
+        gtk_size_group_add_widget(sg_src, l_src);
+        gtk_size_group_add_widget(sg_dst, l_dst);
+        gtk_size_group_add_widget(sg_spt, l_spt);
+        gtk_size_group_add_widget(sg_dpt, l_dpt);
+
+        box_append(root_box, label_box);
+        box_append(label_box, l_num);
+        box_append(label_box, l_prot);
+        box_append(label_box, l_target);
+        box_append(label_box, l_src);
+        box_append(label_box, l_dst);
+        box_append(label_box, l_spt);
+        box_append(label_box, l_dpt);
+        box_append(root_box, w_separator);
+    }
+
+    // Input Box
+    GtkWidget *sb_num, *dd_prot, *dd_target, *e_src, *e_dst, *sb_spt, *sb_dpt;
+    GtkAdjustment *num_adjustment, *spt_adjustment, *dpt_adjustment;
+
+    input_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
+    gtk_widget_add_css_class(input_box, "popup-input-box");
+
+    num_adjustment = gtk_adjustment_new (1, 0, rules.count+1, 1, 5, 0);
+    sb_num = gtk_spin_button_new(num_adjustment, 1, 0);
+
+    dd_prot = gtk_drop_down_new_from_strings(dd_prot_options);
+
+    dd_target = gtk_drop_down_new_from_strings(dd_target_options);
+
+    GtkEntryBuffer* e_src_buff = gtk_entry_buffer_new(NULL, -1);
+    GtkEntryBuffer* e_dst_buff = gtk_entry_buffer_new(NULL, -1);
+    e_src = gtk_entry_new_with_buffer(e_src_buff);
+    e_dst = gtk_entry_new_with_buffer(e_dst_buff);
+
+    spt_adjustment = gtk_adjustment_new (-1, -1, MAX_PORT_ALLOWED, 1, 10, 0);
+    sb_spt = gtk_spin_button_new(spt_adjustment, 1, 0);
+
+    dpt_adjustment = gtk_adjustment_new (-1, -1, MAX_PORT_ALLOWED, 1, 10, 0);
+    sb_dpt = gtk_spin_button_new(dpt_adjustment, 1, 0);
+
+    gtk_size_group_add_widget(sg_num, sb_num);
+    gtk_size_group_add_widget(sg_prot, dd_prot);
+    gtk_size_group_add_widget(sg_target, dd_target);
+    gtk_size_group_add_widget(sg_src, e_src);
+    gtk_size_group_add_widget(sg_dst, e_dst);
+    gtk_size_group_add_widget(sg_spt, sb_spt);
+    gtk_size_group_add_widget(sg_dpt, sb_dpt);
+
+    gtk_widget_add_css_class(sb_num, "input-widget");
+    gtk_widget_add_css_class(dd_prot, "input-widget");
+    gtk_widget_add_css_class(dd_target, "input-widget");
+    gtk_widget_add_css_class(e_src, "input-widget");
+    gtk_widget_add_css_class(e_dst, "input-widget");
+    gtk_widget_add_css_class(sb_spt, "input-widget");
+    gtk_widget_add_css_class(sb_dpt, "input-widget");
+
+    box_append(root_box, input_box);
+
+    box_append(input_box, sb_num);
+    box_append(input_box, dd_prot);
+    box_append(input_box, dd_target);
+    box_append(input_box, e_src);
+    box_append(input_box, e_dst);
+    box_append(input_box, sb_spt);
+    box_append(input_box, sb_dpt);
+    
+
+    GtkWidget* btn_submit = gtk_button_new_with_label("Add Rule");
+    gtk_widget_set_halign(btn_submit, GTK_ALIGN_END);
+    gtk_widget_set_margin_end(btn_submit, 12);
+
+    // TODO: gfree
+    InputWidgets* widgets = g_new(InputWidgets, 1);
+
+    widgets->window = window;
+    widgets->sb_num = sb_num;
+    widgets->dd_prot = dd_prot;
+    widgets->dd_target = dd_target;
+    widgets->e_src = e_src;
+    widgets->e_dst = e_dst;
+    widgets->sb_spt = sb_spt;
+    widgets->sb_dpt = sb_dpt;
+
+    g_signal_connect(GTK_BUTTON(btn_submit), "clicked", G_CALLBACK(query_new_rule), widgets);
+
+    box_append(root_box, btn_submit);
+
+    gtk_window_present(GTK_WINDOW(window));
+}
+
 void populate_bottom_panel(){
     // Buttons
     GtkWidget *panel = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
@@ -117,7 +340,7 @@ void populate_bottom_panel(){
     GtkWidget *w_refresh = gtk_button_new_with_label("Refresh 🗘");
     
     g_signal_connect(GTK_BUTTON(w_refresh), "clicked", G_CALLBACK(load_rules), NULL);
-    // g_signal_connect(GTK_BUTTON(w_add_rule), "clicked", G_CALLBACK(popup_add_rule), NULL);
+    g_signal_connect(GTK_BUTTON(w_add_rule), "clicked", G_CALLBACK(popup_add_rule), NULL);
 
     box_append(panel, w_add_rule);
     box_append(panel, w_refresh);
@@ -237,22 +460,24 @@ GtkWidget* make_rule_box(const Rule rule){
     return box;
 }
 
+
 void load_rules(){
-    Rules rules = {0};
     sudo_cmd("iptables -L INPUT -vn --line-numbers > tables.tmp");
-    box_clear_children(rules_box); // Clear the box
+
+    box_clear_children(rules_box);
+    rules.count = 0;
+
     box_append(rules_box, make_rules_info_header());
     if (!parse_rules_from_file("tables.tmp", &rules)){
         for (size_t i = 0;  i < rules.count; i++) {
             box_append(rules_box, make_rule_box(rules.items[i]));
         }
     }
-    da_free(rules);
+
+    // da_free(rules);
 }
 
-
 void activate(GtkApplication* app){ // , gpointer user_data){
-
     window = gtk_application_window_new(app);
     gtk_window_set_title(GTK_WINDOW(window), "iptables");
     gtk_window_set_default_size(GTK_WINDOW(window), WINDOW_WIDTH, WINDOW_HEIGHT);
