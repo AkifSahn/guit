@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,14 +26,12 @@ typedef enum{
 }Token_Type;
 
 static char** split_str(const char* str, char delim, size_t* num_tokens){
-
     // 1st pass, count tokens
     char* tmp = strdup(str);
     char* dummy = strtok(tmp, &delim);
 
     int token_count = 0;
     while (dummy != NULL) {
-        printf("%s\n", dummy);
         dummy = strtok(NULL, &delim);
         token_count++;
     }
@@ -98,7 +97,7 @@ static void parse_module_token(Rule* rule, const char* token){
     free(sub_tokens);
 }
 
-static int parse_rule_from_line(char* line, Rules* rules){
+static int parse_rule_from_line(const char* line, Rules* rules){
     if (str_has_prefix(line, "Chain") || str_has_prefix(line, "num")) {
         return 0;
     }
@@ -160,7 +159,6 @@ static int parse_rule_from_line(char* line, Rules* rules){
             parse_module_token(&rule, token);
             break;
         default:
-            // assert(0 || "parse_rule_from_line: Token Type not supported");
             fprintf(stderr, "unsupported token: '%s'\n", token);
             return 1;
         }
@@ -176,23 +174,26 @@ static int parse_rule_from_line(char* line, Rules* rules){
 
 int parse_rules_from_file(char* filename, Rules* rules){
     FILE* f = fopen(filename, "r");
-    if (!f) {
-        return 1;
+    if (f == NULL) {
+        fprintf(stderr, "Failed to open file `%s`: %s\n", filename, strerror(errno));
+        exit(1);
     }
 
-    char buffer[1024];
-    char c;
-    int i = 0;
-    while ((c = fgetc(f)) != EOF) {
-        if (c == '\n') {
-            buffer[i++] = '\0';
-            // Parse the line
-            parse_rule_from_line(buffer, rules);
-            i = 0;
-            continue;
-        }
-        buffer[i++] = c;
+    char *buffer = NULL;
+    size_t buffer_size;
+    ssize_t n;
+    while ((n = getline(&buffer, &buffer_size, f)) != -1) {
+        parse_rule_from_line(buffer, rules);
     }
+
+    if (ferror(f)) {
+        fprintf(stderr, "Failed to read file `%s`: %s\n", filename, strerror(errno));
+        free(buffer);
+        exit(1);
+    }
+
+    free(buffer);
+    fclose(f);
 
     return 0;
 }
