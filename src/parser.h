@@ -35,7 +35,7 @@ typedef struct{
 
 #define sudo_cmd(cmd)\
     do{\
-        char _buf[1024];\
+        char _buf[1048];\
         snprintf(_buf, sizeof(_buf), "sudo %s", cmd);\
         do_cmd(_buf);\
     }while(0)

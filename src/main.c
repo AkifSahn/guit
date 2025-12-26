@@ -37,7 +37,7 @@ void load_css(){
     GtkCssProvider *provider = gtk_css_provider_new();
     gtk_css_provider_load_from_path(
             provider,
-            "./style.css"
+            "./src/style.css"
             );
 
     gtk_style_context_add_provider_for_display(
@@ -223,7 +223,7 @@ void popup_add_rule(){
     // Label Box
     {
         GtkWidget *l_num, *l_prot, *l_target, *l_src,
-                  *l_dst, *l_spt, *l_dpt, *l_submit, *w_separator;
+                  *l_dst, *l_spt, *l_dpt, *w_separator;
 
         label_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
         gtk_widget_add_css_class(label_box, "popup-label-box");
