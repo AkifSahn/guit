@@ -25,27 +25,25 @@ typedef enum{
 }Token_Type;
 
 static char** split_str(const char* str, char delim, size_t* num_tokens){
-    size_t str_len = strlen(str);
-    int token_count = 0;
-    char c_prev, c = '\0';
 
     // 1st pass, count tokens
-    for (size_t i = 0; i <= str_len; ++i) {
-        c = str[i];
-        if (c == delim || c == '\0') {
-            if (c_prev != '\0' && c_prev != ' ') {
-                token_count++;
-            }
-        }
-        c_prev = c;
+    char* tmp = strdup(str);
+    char* dummy = strtok(tmp, &delim);
+
+    int token_count = 0;
+    while (dummy != NULL) {
+        printf("%s\n", dummy);
+        dummy = strtok(NULL, &delim);
+        token_count++;
     }
+    free(tmp);
 
+    // 2nd pass, fill the arr
     char** arr = malloc((token_count)*(sizeof(char*)));
-
-    int i = 0;
     char* copy = strdup(str);
     char* token = strtok(copy, &delim);
-    // 2nd pass, fill the arr
+
+    int i = 0;
     while (token != NULL) {
         arr[i++] = strdup(token);
         token = strtok(NULL, &delim);
