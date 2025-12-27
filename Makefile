@@ -1,12 +1,15 @@
+CFLAGS=-Wall -Wextra
+LIBS=`pkg-config --cflags --libs gtk4`
+
 .PHONY: all
 all: build/guit
 
-build/guit:src/guit.c src/parser.c src/parser.h src/ui.h
-	gcc -o build/guit src/guit.c src/parser.c src/ui.c -Wall -Wextra `pkg-config --cflags --libs gtk4`
+build/guit:src/guit.c src/ipt.c src/ui.h src/ipt.h
+	gcc $(CFLAGS) -o build/guit src/guit.c src/ui.c src/ipt.c $(LIBS)
 
 .PHONY: debug
-debug:src/guit.c src/parser.c src/parser.h src/ui.h
-	gcc -o build/guit -g src/guit.c src/parser.c src/ui.c -Wall -Wextra `pkg-config --cflags --libs gtk4`
+debug:src/guit.c src/ipt.c src/ui.h src/ipt.h
+	gcc $(CFLAGS) -g -o build/guit src/guit.c src/ui.c src/ipt.c $(LIBS)
 
 .PHONY: clean
 clean:

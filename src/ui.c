@@ -1,4 +1,5 @@
 #include "ui.h"
+#include "ipt.h"
 
 // Global variables
 static GtkWidget* rootBox;
@@ -131,7 +132,8 @@ void query_new_rule(GtkButton* btn, void* data){
 
     bool run_cmd = true;
     int num, spt, dpt;
-    const char *prot, *target, *src, *dst;
+    char *src, *dst;
+    const char *prot, *target;
 
     num = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(widgets.sb_num));
     spt = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(widgets.sb_spt));
@@ -143,54 +145,38 @@ void query_new_rule(GtkButton* btn, void* data){
     sel = gtk_drop_down_get_selected(GTK_DROP_DOWN(widgets.dd_target));
     target = dd_target_options[sel];
 
-    src = entry_get_text(GTK_ENTRY(widgets.e_src));
-    dst = entry_get_text(GTK_ENTRY(widgets.e_dst));
+    src = strdup(entry_get_text(GTK_ENTRY(widgets.e_src)));
+    dst = strdup(entry_get_text(GTK_ENTRY(widgets.e_dst)));
+    str_trim(src);
+    str_trim(dst);
 
-    char cmd[1024];
-    int i = 0;
-    i += sprintf(cmd+i, "iptables -I INPUT %d -p %s -j %s", num, prot, target);
-
-    if (strcmp(src, "")){
-        char* src_copy = strdup(src);
-        trim_whitespace(src_copy);
-
+    if (*src){
         if (gtk_widget_has_css_class(widgets.e_src, "error-entry"))
             gtk_widget_remove_css_class(widgets.e_src, "error-entry");
 
-        if (!is_valid_ipv4_or_cidr(src_copy)) {
+        if (!is_valid_ipv4_or_cidr(src)) {
             run_cmd = false;
             gtk_widget_add_css_class(widgets.e_src, "error-entry");
         }
-
-        i += sprintf(cmd+i, " -s %s", src_copy);
-        free(src_copy);
     }
 
-    if (strcmp(dst, "")){
-        char* dst_copy = strdup(dst);
-        trim_whitespace(dst_copy);
-
+    if (*dst){
         if (gtk_widget_has_css_class(widgets.e_dst, "error-entry"))
             gtk_widget_remove_css_class(widgets.e_dst, "error-entry");
 
-        if (!is_valid_ipv4_or_cidr(dst_copy)) {
+        if (!is_valid_ipv4_or_cidr(dst)) {
             run_cmd = false;
             gtk_widget_add_css_class(widgets.e_dst, "error-entry");
         }
-
-        i += sprintf(cmd+i, " -d %s", dst_copy);
-        free(dst_copy);
     }
 
-    if (spt >= 0) i += sprintf(cmd+i, " --sport %d", spt);
-    if (dpt >= 0) i += sprintf(cmd+i, " --dport %d", dpt);
-
     if (run_cmd){
-        printf("Executing command: `%s`\n", cmd);
-        sudo_cmd(cmd);
+        ipt_insert_new_rule(num, src, dst, prot, spt, dpt, target);
         gtk_window_destroy(GTK_WINDOW(widgets.window));
         ui_load_rules();
     }
+    free(src);
+    free(dst);
 }
 
 void popup_add_rule(){
@@ -257,7 +243,7 @@ void popup_add_rule(){
     input_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
     gtk_widget_add_css_class(input_box, "popup-input-box");
 
-    num_adjustment = gtk_adjustment_new (1, 0, rules.count+1, 1, 5, 0);
+    num_adjustment = gtk_adjustment_new (1, 1, rules.count+1, 1, 5, 0);
     sb_num = gtk_spin_button_new(num_adjustment, 1, 0);
 
     dd_prot = gtk_drop_down_new_from_strings(dd_prot_options);
@@ -444,19 +430,17 @@ GtkWidget* make_rule_box(const Rule rule){
 
 
 void ui_load_rules(){
-    sudo_cmd("iptables -L INPUT -vn --line-numbers > tables.tmp");
-
     box_clear_children(rules_box);
+    box_append(rules_box, make_rules_info_header());
+
     rules.count = 0;
 
-    box_append(rules_box, make_rules_info_header());
+    ipt_save_rule_listing_to_file("tables.tmp");
     if (!parse_rules_from_file("tables.tmp", &rules)){
         for (size_t i = 0;  i < rules.count; i++) {
             box_append(rules_box, make_rule_box(rules.items[i]));
         }
     }
-
-    // da_free(rules);
 }
 
 void ui_activate(GtkApplication* app){

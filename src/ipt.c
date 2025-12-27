@@ -1,11 +1,15 @@
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "parser.h"
+#include <sys/wait.h>
+#include <unistd.h>
+
+#include "ipt.h"
 
 // Enum members are ordered in token appearance order in:
 // 'iptables -L INPUT -nv --line-numbers'
@@ -69,7 +73,7 @@ static bool str_has_prefix(const char* str, const char* prefix){
     return true;
 }
 
-void trim_whitespace(char* str){
+void str_trim(char* str){
     char *start = str;
     char *end;
 
@@ -265,4 +269,132 @@ int parse_rules_from_file(char* filename, Rules* rules){
     fclose(f);
 
     return 0;
+}
+
+int ipt_run(char* const args[]){
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        return -1;
+    }
+
+    if (pid == 0) {
+        execvp(args[0], args);
+        exit(0);
+    }
+
+    int status;
+    waitpid(pid, &status, 0);
+    return status;
+}
+
+/*
+ * Calls `execvp` with given args in a new fork.
+ * Returns 0 on succes, non-zero on failure.
+ * 
+ */
+int ipt_run_to_file(const char* filename, char* const args[]) {
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        return -1;
+    }
+
+    if (pid == 0) {
+        int fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd < 0) {
+            perror("open");
+            exit(1);
+        }
+
+        dup2(fd, STDOUT_FILENO);
+
+        close(fd);
+        execvp(args[0], args);
+        exit(0);
+    }
+
+    int status;
+    waitpid(pid, &status, 0);
+    return status;
+}
+
+
+
+// Saves iptables rule listings to a file.
+void ipt_save_rule_listing_to_file(const char* filename){
+    char* const args[] = {
+        "sudo", "iptables",
+        "-L", "INPUT", "-nv",
+        "--line-numbers",
+        NULL };
+
+    if (ipt_run_to_file(filename, args) != 0){
+        exit(1);
+    }
+}
+
+void ipt_insert_new_rule(int num, const char* src, const char* dst,
+        const char* prot, int sport, int dport, const char* target)
+{
+    char* args[50] = {
+        "sudo", "iptables",
+        "-I", "INPUT"}; 
+    int i = 4;
+
+    char *num_arg = NULL;
+    char *sport_arg = NULL;
+    char *dport_arg = NULL;
+
+    char buffer[128];
+    sprintf(buffer, "%d", num);
+    num_arg = strdup(buffer);
+    args[i++] = num_arg;
+
+
+    if (*src){
+        args[i++] = "-s";
+        args[i++] = (char*)src;
+    }
+
+    if (*dst){
+        args[i++] = "-d";
+        args[i++] = (char*)dst;
+    }
+
+    args[i++] = "-p";
+    args[i++] = (char*)prot;
+
+    if (!strcmp(prot, "tcp") || !strcmp(prot, "udp")){
+        if (sport >= 0){
+            args[i++] = "--sport";
+            sprintf(buffer, "%d", sport);
+            sport_arg = strdup(buffer);
+            args[i++] = sport_arg;
+        }
+        if (dport >= 0){
+            args[i++] = "--dport";
+            sprintf(buffer, "%d", dport);
+            dport_arg = strdup(buffer);
+            args[i++] = dport_arg;
+        }
+    }
+
+    if(*target){
+        args[i++] = "-j";
+        args[i++] = (char*)target;
+    }
+
+    args[i++] = NULL;
+
+    if (ipt_run(args) != 0){
+        fprintf(stderr, "ipt_inert_new_rule - failed to run iptables command:\n");
+        for (int j = 0; j < i-1; j++) {
+            fprintf(stderr, "%s ", args[j]);
+        }
+    }
+
+    free(num_arg);
+    if (sport_arg) free(sport_arg);
+    if (dport_arg) free(dport_arg);
 }
