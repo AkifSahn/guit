@@ -267,6 +267,7 @@ int parse_rules_from_file(char* filename, Rules* rules){
 
     free(buffer);
     fclose(f);
+    remove(filename);
 
     return 0;
 }
