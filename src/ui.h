@@ -9,7 +9,7 @@
 #define WINDOW_WIDTH 700
 #define WINDOW_HEIGHT 500
 
-#define root_append(widget) gtk_box_append(GTK_BOX(rootBox), widget)
+#define root_append(app, widget) gtk_box_append(GTK_BOX(app.root_box), widget)
 #define box_append(box, widget) gtk_box_append(GTK_BOX(box), widget)
 
 #define entry_get_text(entry) gtk_entry_buffer_get_text(gtk_entry_get_buffer(entry))

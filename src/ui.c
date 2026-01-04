@@ -1,10 +1,22 @@
 #include "ui.h"
 #include "ipt.h"
 
+#define INPUT_POPUP_WIDTH 900
+#define INPUT_POPUP_HEIGHT 150
+
+#define INSERT_IP_POPUP_WIDTH 500
+#define INSERT_IP_POPUP_HEIGHT 150
+
 // Global variables
-static GtkWidget* rootBox;
-static GtkWidget* window;
-static GtkWidget* rules_box;
+typedef struct{
+    GtkWidget* window;
+    GtkWidget* root_box;
+    GtkWidget* rules_box;
+
+    Rules rules;
+}AppState;
+
+static AppState state = {0};
 
 static GtkSizeGroup* sg_num;
 static GtkSizeGroup* sg_pkts;
@@ -15,12 +27,6 @@ static GtkSizeGroup* sg_dst;
 static GtkSizeGroup* sg_spt;
 static GtkSizeGroup* sg_dpt;
 static GtkSizeGroup* sg_actions;
-
-#define INPUT_POPUP_WIDTH 900
-#define INPUT_POPUP_HEIGHT 150
-
-#define INSERT_IP_POPUP_WIDTH 500
-#define INSERT_IP_POPUP_HEIGHT 150
 
 typedef struct{
     GtkWidget *window;
@@ -39,8 +45,6 @@ typedef struct{
 static const char* dd_prot_options[] = {"all", "tcp", "udp", NULL};
 static const char* dd_target_options[] = {"ACCEPT", "REJECT", "DROP", NULL};
 
-Rules rules = {0};
-
 int get_dropdown_index(const char** options, const char* target) {
     if (!target) return 0;
     for (int i = 0; options[i] != NULL; i++) {
@@ -57,7 +61,7 @@ void load_css(){
             );
 
     gtk_style_context_add_provider_for_display(
-            gtk_widget_get_display(window),
+            gtk_widget_get_display(state.window),
             GTK_STYLE_PROVIDER(provider),
             GTK_STYLE_PROVIDER_PRIORITY_APPLICATION
             );
@@ -97,7 +101,7 @@ void populate_top_panel(){
     topPanel = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
     gtk_widget_add_css_class(topPanel, "top-panel");
     gtk_widget_set_hexpand(topPanel, TRUE);
-    root_append(topPanel);
+    root_append(state, topPanel);
 
     // Label
     GtkWidget* label_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
@@ -130,17 +134,17 @@ void populate_top_panel(){
 void populate_rule_listing_box(){
     GtkWidget *scrolled_window = gtk_scrolled_window_new();
 
-    rules_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    state.rules_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 
 
-    gtk_widget_add_css_class(rules_box, "rules-box");
+    gtk_widget_add_css_class(state.rules_box, "rules-box");
 
-    gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scrolled_window), rules_box);
+    gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scrolled_window), state.rules_box);
     gtk_widget_set_vexpand(scrolled_window, TRUE);
 
     init_rules_box_size_groups();
     ui_load_rules();
-    root_append(scrolled_window);
+    root_append(state, scrolled_window);
 }
 
 void query_new_rule(GtkButton* btn, void* data){
@@ -216,7 +220,7 @@ void popup_rule_window(const Rule* rule_to_edit){
     GtkWidget *root_box, *input_box, *label_box;
     root_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     gtk_widget_set_halign(root_box, GTK_ALIGN_CENTER);
-    gtk_widget_set_hexpand(rootBox, TRUE);
+    gtk_widget_set_hexpand(state.root_box, TRUE);
     gtk_widget_add_css_class(window, "root");
     gtk_window_set_child(GTK_WINDOW(window), root_box);
 
@@ -271,7 +275,7 @@ void popup_rule_window(const Rule* rule_to_edit){
     input_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
     gtk_widget_add_css_class(input_box, "popup-input-box");
 
-    num_adjustment = gtk_adjustment_new (1, 1, rules.count+1, 1, 5, 0);
+    num_adjustment = gtk_adjustment_new (1, 1, state.rules.count+1, 1, 5, 0);
     sb_num = gtk_spin_button_new(num_adjustment, 1, 0);
     if (rule_to_edit) {
         gtk_spin_button_set_value(GTK_SPIN_BUTTON(sb_num), rule_to_edit->num);
@@ -279,7 +283,7 @@ void popup_rule_window(const Rule* rule_to_edit){
         // gtk_widget_set_sensitive(sb_num, false); 
     } else {
         // Default to appending (count + 1)
-        gtk_spin_button_set_value(GTK_SPIN_BUTTON(sb_num), rules.count + 1);
+        gtk_spin_button_set_value(GTK_SPIN_BUTTON(sb_num), state.rules.count + 1);
     }
 
     dd_prot = gtk_drop_down_new_from_strings(dd_prot_options);
@@ -378,9 +382,9 @@ void on_edit_rule(GtkWidget* btn, gpointer data) {
 
     // Find the rule in our global 'rules' array
     Rule* found_rule = NULL;
-    for(size_t i = 0; i < rules.count; i++){
-        if(rules.items[i].num == rule_num){
-            found_rule = &rules.items[i];
+    for(size_t i = 0; i < state.rules.count; i++){
+        if(state.rules.items[i].num == rule_num){
+            found_rule = &state.rules.items[i];
             break;
         }
     }
@@ -422,7 +426,7 @@ void bulk_insert_ip(){
     GtkEntryBuffer* e_buffer;
 
     root_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-    gtk_widget_set_hexpand(rootBox, TRUE);
+    gtk_widget_set_hexpand(state.root_box, TRUE);
     gtk_widget_add_css_class(window, "root");
     gtk_window_set_child(GTK_WINDOW(window), root_box);
 
@@ -472,7 +476,7 @@ void populate_bottom_panel(){
     box_append(panel, w_refresh);
     box_append(panel, w_bulk_ip);
 
-    root_append(panel);
+    root_append(state, panel);
 }
 
 GtkWidget* make_rules_info_header(){
@@ -590,35 +594,35 @@ GtkWidget* make_rule_box(const Rule rule){
     box_append(actions_box, w_edit);
     box_append(actions_box, w_delete);
 
-    box_append(rules_box, w_separator);
+    box_append(state.rules_box, w_separator);
 
     return box;
 }
 
 void ui_load_rules(){
-    box_clear_children(rules_box);
-    box_append(rules_box, make_rules_info_header());
+    box_clear_children(state.rules_box);
+    box_append(state.rules_box, make_rules_info_header());
 
-    rules.count = 0;
+    state.rules.count = 0;
 
     ipt_save_rule_listing_to_file("tables.tmp");
-    if (!parse_rules_from_file("tables.tmp", &rules)){
-        for (size_t i = 0;  i < rules.count; i++) {
-            box_append(rules_box, make_rule_box(rules.items[i]));
+    if (!parse_rules_from_file("tables.tmp", &state.rules)){
+        for (size_t i = 0;  i < state.rules.count; i++) {
+            box_append(state.rules_box, make_rule_box(state.rules.items[i]));
         }
     }
 }
 
 void ui_activate(GtkApplication* app){
-    window = gtk_application_window_new(app);
-    gtk_window_set_title(GTK_WINDOW(window), "iptables");
-    gtk_window_set_default_size(GTK_WINDOW(window), WINDOW_WIDTH, WINDOW_HEIGHT);
+    state.window = gtk_application_window_new(app);
+    gtk_window_set_title(GTK_WINDOW(state.window), "iptables");
+    gtk_window_set_default_size(GTK_WINDOW(state.window), WINDOW_WIDTH, WINDOW_HEIGHT);
 
     // Add root box
-    rootBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-    gtk_widget_set_hexpand(rootBox, TRUE);
-    gtk_widget_add_css_class(window, "root");
-    gtk_window_set_child(GTK_WINDOW(window), rootBox);
+    state.root_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_widget_set_hexpand(state.root_box, TRUE);
+    gtk_widget_add_css_class(state.window, "root");
+    gtk_window_set_child(GTK_WINDOW(state.window), state.root_box);
 
     populate_top_panel();
     populate_rule_listing_box();
@@ -626,5 +630,5 @@ void ui_activate(GtkApplication* app){
 
     load_css();
 
-    gtk_window_present(GTK_WINDOW(window));
+    gtk_window_present(GTK_WINDOW(state.window));
 }
