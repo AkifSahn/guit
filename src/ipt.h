@@ -67,4 +67,11 @@ void ipt_insert_new_rule(int num, const char* src, const char* dst,
 void ipt_whitelist_ips(const char* ips);
 void ipt_blacklist_ips(const char* ips);
 
+void ipt_delete_rule(int num);
+void ipt_replace_rule(int num, const char* src, const char* dst,
+        const char* prot, int sport, int dport, const char* target);
+
+void print_rule(Rule rule);
+void print_rules(const Rules* rules);
+
 #endif /* ifndef IPT_H */

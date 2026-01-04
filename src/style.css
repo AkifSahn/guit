@@ -97,3 +97,26 @@ label.title {
     color: var(--text);
     border-radius: 6px;
 }
+
+/* Base style for action buttons */
+.action-widgets {
+    background-color: transparent;
+    border: 1px solid transparent;
+    padding: 6px;
+    margin: 0 2px;
+    color: var(--text-muted);
+}
+
+/* Edit Button Hover */
+.action-widgets:first-child:hover {
+    background-color: rgba(90, 169, 230, 0.2); /* Low opacity accent */
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+/* Delete Button Hover */
+.action-widgets:last-child:hover {
+    background-color: rgba(235, 87, 87, 0.2); /* Low opacity error */
+    color: var(--error);
+    border-color: var(--error);
+}

@@ -14,6 +14,7 @@ static GtkSizeGroup* sg_src;
 static GtkSizeGroup* sg_dst;
 static GtkSizeGroup* sg_spt;
 static GtkSizeGroup* sg_dpt;
+static GtkSizeGroup* sg_actions;
 
 #define INPUT_POPUP_WIDTH 900
 #define INPUT_POPUP_HEIGHT 150
@@ -30,12 +31,23 @@ typedef struct{
     GtkWidget *e_dst;
     GtkWidget *sb_spt;
     GtkWidget *sb_dpt;
+
+    // If > 0, we are editing this specific rule number
+    int editing_rule_num;
 }InputWidgets;
 
 static const char* dd_prot_options[] = {"all", "tcp", "udp", NULL};
 static const char* dd_target_options[] = {"ACCEPT", "REJECT", "DROP", NULL};
 
 Rules rules = {0};
+
+int get_dropdown_index(const char** options, const char* target) {
+    if (!target) return 0;
+    for (int i = 0; options[i] != NULL; i++) {
+        if (strcmp(options[i], target) == 0) return i;
+    }
+    return 0; // Default to first if not found
+}
 
 void load_css(){
     GtkCssProvider *provider = gtk_css_provider_new();
@@ -60,6 +72,7 @@ void init_rules_box_size_groups(){
     sg_dst = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
     sg_spt = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
     sg_dpt = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
+    sg_actions = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
 }
 
 void box_clear_children(GtkWidget *parent){
@@ -174,18 +187,31 @@ void query_new_rule(GtkButton* btn, void* data){
     }
 
     if (run_cmd){
-        ipt_insert_new_rule(num, src, dst, prot, spt, dpt, target);
+        if (widgets.editing_rule_num > 0) {
+            ipt_replace_rule(widgets.editing_rule_num, src, dst, prot, spt, dpt, target);
+        }else{
+            ipt_insert_new_rule(num, src, dst, prot, spt, dpt, target);
+        }
         gtk_window_destroy(GTK_WINDOW(widgets.window));
         ui_load_rules();
     }
     free(src);
     free(dst);
+    g_free(data);
 }
 
-void popup_add_rule(){
+// If rule_to_edit is NULL -> Add Mode
+// If rule_to_edit is set -> Edit Mode
+void popup_rule_window(const Rule* rule_to_edit){
     GtkWidget* window = gtk_window_new();
     gtk_window_set_resizable(GTK_WINDOW(window), false);
     gtk_window_set_default_size(GTK_WINDOW(window), INPUT_POPUP_WIDTH, INPUT_POPUP_HEIGHT);
+
+    if (rule_to_edit) {
+        gtk_window_set_title(GTK_WINDOW(window), "Edit Rule");
+    }else{
+        gtk_window_set_title(GTK_WINDOW(window), "Add Rule");
+    }
 
     GtkWidget *root_box, *input_box, *label_box;
     root_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
@@ -247,21 +273,45 @@ void popup_add_rule(){
 
     num_adjustment = gtk_adjustment_new (1, 1, rules.count+1, 1, 5, 0);
     sb_num = gtk_spin_button_new(num_adjustment, 1, 0);
+    if (rule_to_edit) {
+        gtk_spin_button_set_value(GTK_SPIN_BUTTON(sb_num), rule_to_edit->num);
+        // Usually, when editing, you don't change the number, so maybe disable it?
+        // gtk_widget_set_sensitive(sb_num, false); 
+    } else {
+        // Default to appending (count + 1)
+        gtk_spin_button_set_value(GTK_SPIN_BUTTON(sb_num), rules.count + 1);
+    }
 
     dd_prot = gtk_drop_down_new_from_strings(dd_prot_options);
+    if (rule_to_edit && rule_to_edit->prot) {
+        gtk_drop_down_set_selected(GTK_DROP_DOWN(dd_prot), 
+            get_dropdown_index(dd_prot_options, rule_to_edit->prot));
+    }
 
     dd_target = gtk_drop_down_new_from_strings(dd_target_options);
+    if (rule_to_edit && rule_to_edit->target) {
+        gtk_drop_down_set_selected(GTK_DROP_DOWN(dd_target), 
+            get_dropdown_index(dd_target_options, rule_to_edit->target));
+    }
 
     GtkEntryBuffer* e_src_buff = gtk_entry_buffer_new(NULL, -1);
+    if (rule_to_edit && rule_to_edit->src) 
+        gtk_entry_buffer_set_text(e_src_buff, rule_to_edit->src, -1);
+
     GtkEntryBuffer* e_dst_buff = gtk_entry_buffer_new(NULL, -1);
+    if (rule_to_edit && rule_to_edit->dst) 
+        gtk_entry_buffer_set_text(e_dst_buff, rule_to_edit->dst, -1);
+
     e_src = gtk_entry_new_with_buffer(e_src_buff);
     e_dst = gtk_entry_new_with_buffer(e_dst_buff);
 
     spt_adjustment = gtk_adjustment_new (-1, -1, MAX_PORT_ALLOWED, 1, 10, 0);
     sb_spt = gtk_spin_button_new(spt_adjustment, 1, 0);
+    if (rule_to_edit) gtk_spin_button_set_value(GTK_SPIN_BUTTON(sb_spt), rule_to_edit->sport);
 
     dpt_adjustment = gtk_adjustment_new (-1, -1, MAX_PORT_ALLOWED, 1, 10, 0);
     sb_dpt = gtk_spin_button_new(dpt_adjustment, 1, 0);
+    if (rule_to_edit) gtk_spin_button_set_value(GTK_SPIN_BUTTON(sb_dpt), rule_to_edit->dport);
 
     gtk_size_group_add_widget(sg_num, sb_num);
     gtk_size_group_add_widget(sg_prot, dd_prot);
@@ -290,7 +340,7 @@ void popup_add_rule(){
     box_append(input_box, sb_dpt);
     
 
-    GtkWidget* btn_submit = gtk_button_new_with_label("Add Rule");
+    GtkWidget* btn_submit = gtk_button_new_with_label(rule_to_edit ? "Save Changes" : "Add Rule");
     gtk_widget_set_halign(btn_submit, GTK_ALIGN_END);
     gtk_widget_set_margin_end(btn_submit, 12);
 
@@ -306,11 +356,44 @@ void popup_add_rule(){
     widgets->sb_spt = sb_spt;
     widgets->sb_dpt = sb_dpt;
 
+    widgets->editing_rule_num = rule_to_edit ? rule_to_edit->num : 0;
+
     g_signal_connect(GTK_BUTTON(btn_submit), "clicked", G_CALLBACK(query_new_rule), widgets);
 
     box_append(root_box, btn_submit);
 
     gtk_window_present(GTK_WINDOW(window));
+}
+
+void on_delete_rule(GtkWidget* btn, gpointer data) {
+    int rule_num = GPOINTER_TO_INT(data);
+    ipt_delete_rule(rule_num); 
+    ui_load_rules();
+    
+    g_print("Deleted rule #%d\n", rule_num);
+}
+
+void on_edit_rule(GtkWidget* btn, gpointer data) {
+    int rule_num = GPOINTER_TO_INT(data);
+
+    // Find the rule in our global 'rules' array
+    Rule* found_rule = NULL;
+    for(size_t i = 0; i < rules.count; i++){
+        if(rules.items[i].num == rule_num){
+            found_rule = &rules.items[i];
+            break;
+        }
+    }
+
+    if(found_rule){
+        popup_rule_window(found_rule);
+    } else {
+        g_printerr("Error: Could not find rule #%d to edit\n", rule_num);
+    }
+}
+
+void on_add_rule_clicked(GtkWidget* btn, gpointer data){
+    popup_rule_window(NULL);
 }
 
 void query_insert_ips(GtkButton* self, void* data){
@@ -382,7 +465,7 @@ void populate_bottom_panel(){
     GtkWidget *w_bulk_ip = gtk_button_new_with_label("Blacklist/Whitelist IPs");
     
     g_signal_connect(GTK_BUTTON(w_refresh), "clicked", G_CALLBACK(ui_load_rules), NULL);
-    g_signal_connect(GTK_BUTTON(w_add_rule), "clicked", G_CALLBACK(popup_add_rule), NULL);
+    g_signal_connect(GTK_BUTTON(w_add_rule), "clicked", G_CALLBACK(on_add_rule_clicked), NULL);
     g_signal_connect(GTK_BUTTON(w_bulk_ip), "clicked", G_CALLBACK(bulk_insert_ip), NULL);
 
     box_append(panel, w_add_rule);
@@ -393,7 +476,8 @@ void populate_bottom_panel(){
 }
 
 GtkWidget* make_rules_info_header(){
-    GtkWidget *w_num, *w_pkts, *w_prot, *w_target, *w_src, *w_dst, *w_spt, *w_dpt;
+    GtkWidget *w_num, *w_pkts, *w_prot, *w_target,
+              *w_src, *w_dst, *w_spt, *w_dpt, *w_actions;
     GtkWidget* box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
 
     w_num = gtk_label_new("num");
@@ -405,6 +489,7 @@ GtkWidget* make_rules_info_header(){
     w_dst = gtk_label_new("dst");
     w_spt = gtk_label_new("spt");
     w_dpt = gtk_label_new("dpt");
+    w_actions = gtk_label_new("actions");
 
     // gtk_widget_set_hexpand(w_num, TRUE);
     gtk_widget_set_hexpand(w_pkts, TRUE);
@@ -423,6 +508,7 @@ GtkWidget* make_rules_info_header(){
     gtk_size_group_add_widget(sg_dst, w_dst);
     gtk_size_group_add_widget(sg_spt, w_spt);
     gtk_size_group_add_widget(sg_dpt, w_dpt);
+    gtk_size_group_add_widget(sg_actions, w_actions);
 
     box_append(box, w_num);
     box_append(box, w_pkts);
@@ -432,12 +518,14 @@ GtkWidget* make_rules_info_header(){
     box_append(box, w_dst);
     box_append(box, w_spt);
     box_append(box, w_dpt);
+    box_append(box, w_actions);
 
     return box;
 }
 
 GtkWidget* make_rule_box(const Rule rule){
     GtkWidget *w_num, *w_pkts, *w_prot, *w_target, *w_src, *w_dst, *w_spt, *w_dpt, *w_separator;
+    GtkWidget *actions_box, *w_delete, *w_edit;
     GtkWidget* box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     gtk_widget_add_css_class(box, "rule-box");
 
@@ -458,6 +546,11 @@ GtkWidget* make_rule_box(const Rule rule){
     snprintf(str_buffer, sizeof(str_buffer), "%d",rule.dport);
     w_dpt = gtk_label_new(rule.dport >= 0 ? str_buffer : NULL);
 
+    // Actions 
+    w_delete = gtk_button_new_from_icon_name("delete");
+    w_edit = gtk_button_new_from_icon_name("edit");
+    actions_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
+
     w_separator = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
 
     // gtk_widget_set_hexpand(w_num, TRUE);
@@ -477,6 +570,13 @@ GtkWidget* make_rule_box(const Rule rule){
     gtk_size_group_add_widget(sg_dst, w_dst);
     gtk_size_group_add_widget(sg_spt, w_spt);
     gtk_size_group_add_widget(sg_dpt, w_dpt);
+    gtk_size_group_add_widget(sg_actions, actions_box);
+
+    gtk_widget_add_css_class(w_edit, "action-widgets");
+    gtk_widget_add_css_class(w_delete, "action-widgets");
+
+    g_signal_connect(GTK_BUTTON(w_delete), "clicked", G_CALLBACK(on_delete_rule), GINT_TO_POINTER(rule.num));
+    g_signal_connect(GTK_BUTTON(w_edit), "clicked", G_CALLBACK(on_edit_rule), GINT_TO_POINTER(rule.num));
 
     box_append(box, w_num);
     box_append(box, w_pkts);
@@ -486,12 +586,14 @@ GtkWidget* make_rule_box(const Rule rule){
     box_append(box, w_dst);
     box_append(box, w_spt);
     box_append(box, w_dpt);
+    box_append(box, actions_box);
+    box_append(actions_box, w_edit);
+    box_append(actions_box, w_delete);
 
     box_append(rules_box, w_separator);
 
     return box;
 }
-
 
 void ui_load_rules(){
     box_clear_children(rules_box);

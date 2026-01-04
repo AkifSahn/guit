@@ -271,6 +271,18 @@ int parse_rules_from_file(char* filename, Rules* rules){
     return 0;
 }
 
+void print_rule(Rule rule){
+    printf("#%d -- %d pkts %s %s %s %s %d %d\n",
+            rule.num, rule.pkts, rule.prot, rule.target,
+            rule.src, rule.dst, rule.sport, rule.dport);
+}
+
+void print_rules(const Rules* rules){
+    for (size_t i = 0; i < rules->count; ++i) {
+        print_rule(rules->items[i]);
+    }
+}
+
 int ipt_run(char* const args[]){
     pid_t pid = fork();
     if (pid < 0) {
@@ -457,3 +469,83 @@ void ipt_blacklist_ips(const char* ips){
     free(tokens);
 }
 
+void ipt_delete_rule(int num){
+    char num_str[16];
+    snprintf(num_str, sizeof(num_str), "%d", num);
+
+    char* const args[] = {
+        "sudo", "iptables",
+        "-D", "INPUT",
+        num_str,
+        NULL
+    };
+
+    int status = ipt_run(args);
+    if (status != 0) {
+        fprintf(stderr, "Error: failed to delete rule #%d (status=%d)\n", num, status);
+    }
+}
+
+void ipt_replace_rule(int num, const char* src, const char* dst,
+        const char* prot, int sport, int dport, const char* target) {
+    char* args[50] = {
+        "sudo", "iptables",
+        "-R", "INPUT" // -R for Replace
+    }; 
+    int i = 4;
+
+    char *num_arg = NULL;
+    char *sport_arg = NULL;
+    char *dport_arg = NULL;
+
+    char buffer[128];
+    sprintf(buffer, "%d", num);
+    num_arg = strdup(buffer);
+    args[i++] = num_arg;
+
+    if (*src){
+        args[i++] = "-s";
+        args[i++] = (char*)src;
+    }
+
+    if (*dst){
+        args[i++] = "-d";
+        args[i++] = (char*)dst;
+    }
+
+    args[i++] = "-p";
+    args[i++] = (char*)prot;
+
+    if (!strcmp(prot, "tcp") || !strcmp(prot, "udp")){
+        if (sport >= 0){
+            args[i++] = "--sport";
+            sprintf(buffer, "%d", sport);
+            sport_arg = strdup(buffer);
+            args[i++] = sport_arg;
+        }
+        if (dport >= 0){
+            args[i++] = "--dport";
+            sprintf(buffer, "%d", dport);
+            dport_arg = strdup(buffer);
+            args[i++] = dport_arg;
+        }
+    }
+
+    if(*target){
+        args[i++] = "-j";
+        args[i++] = (char*)target;
+    }
+
+    args[i++] = NULL;
+
+    if (ipt_run(args) != 0){
+        fprintf(stderr, "ipt_replace_rule - failed to run iptables command:\n");
+        for (int j = 0; j < i-1; j++) {
+            fprintf(stderr, "%s ", args[j]);
+        }
+        fprintf(stderr, "\n");
+    }
+
+    free(num_arg);
+    if (sport_arg) free(sport_arg);
+    if (dport_arg) free(dport_arg);}
