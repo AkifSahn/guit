@@ -319,8 +319,6 @@ int ipt_run_to_file(const char* filename, char* const args[]) {
     return status;
 }
 
-
-
 // Saves iptables rule listings to a file.
 void ipt_save_rule_listing_to_file(const char* filename){
     char* const args[] = {
@@ -398,3 +396,64 @@ void ipt_insert_new_rule(int num, const char* src, const char* dst,
     if (sport_arg) free(sport_arg);
     if (dport_arg) free(dport_arg);
 }
+
+void ipt_whitelist_ips(const char* ips){
+    char** tokens;
+    size_t num_tokens;
+    tokens = split_str(ips, ' ', &num_tokens);
+
+    for (size_t i = 0; i < num_tokens; ++i) {
+        char* ip = tokens[i];
+
+        if (is_valid_ipv4_or_cidr(ip)) {
+            char* const args[] = {
+                "sudo", "iptables",
+                "-A", "INPUT",
+                "-s", ip,
+                "-j", "ACCEPT",
+                NULL
+            };
+
+            int status = ipt_run(args);
+            if (status != 0) {
+                fprintf(stderr, "Error: failed to add iptables rule for %s (status=%d)\n", ip, status);
+            }
+        }
+    }
+
+    for (size_t i = 0; i < num_tokens; ++i) {
+        free(tokens[i]);
+    }
+    free(tokens);
+}
+
+void ipt_blacklist_ips(const char* ips){
+    char** tokens;
+    size_t num_tokens;
+    tokens = split_str(ips, ' ', &num_tokens);
+
+    for (size_t i = 0; i < num_tokens; ++i) {
+        char* ip = tokens[i];
+
+        if (is_valid_ipv4_or_cidr(ip)) {
+            char* const args[] = {
+                "sudo", "iptables",
+                "-A", "INPUT",
+                "-s", ip,
+                "-j", "DROP",
+                NULL
+            };
+
+            int status = ipt_run(args);
+            if (status != 0) {
+                fprintf(stderr, "Error: failed to add iptables rule for %s (status=%d)\n", ip, status);
+            }
+        }
+    }
+
+    for (size_t i = 0; i < num_tokens; ++i) {
+        free(tokens[i]);
+    }
+    free(tokens);
+}
+

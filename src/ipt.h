@@ -64,4 +64,7 @@ void ipt_save_rule_listing_to_file(const char* filename);
 void ipt_insert_new_rule(int num, const char* src, const char* dst,
         const char* prot, int sport, int dport, const char* target);
 
+void ipt_whitelist_ips(const char* ips);
+void ipt_blacklist_ips(const char* ips);
+
 #endif /* ifndef IPT_H */

@@ -16,7 +16,10 @@ static GtkSizeGroup* sg_spt;
 static GtkSizeGroup* sg_dpt;
 
 #define INPUT_POPUP_WIDTH 900
-#define INPUT_POPUP_HEIGHT 200
+#define INPUT_POPUP_HEIGHT 150
+
+#define INSERT_IP_POPUP_WIDTH 500
+#define INSERT_IP_POPUP_HEIGHT 150
 
 typedef struct{
     GtkWidget *window;
@@ -96,8 +99,8 @@ void populate_top_panel(){
     gtk_widget_set_hexpand(button_row, TRUE);
 
     GtkWidget *inputButton = gtk_button_new_with_label("Input");
-    GtkWidget *outputButton = gtk_button_new_with_label("output");
-    GtkWidget *forwardButton = gtk_button_new_with_label("forward");
+    GtkWidget *outputButton = gtk_button_new_with_label("Whitelist");
+    GtkWidget *forwardButton = gtk_button_new_with_label("Blacklist");
 
     gtk_widget_set_hexpand(inputButton, TRUE);
     gtk_widget_set_hexpand(outputButton, TRUE);
@@ -190,7 +193,6 @@ void popup_add_rule(){
     gtk_widget_set_hexpand(rootBox, TRUE);
     gtk_widget_add_css_class(window, "root");
     gtk_window_set_child(GTK_WINDOW(window), root_box);
-
 
     GtkSizeGroup* sg_num = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
     GtkSizeGroup* sg_prot = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
@@ -311,6 +313,65 @@ void popup_add_rule(){
     gtk_window_present(GTK_WINDOW(window));
 }
 
+void query_insert_ips(GtkButton* self, void* data){
+    const char* label = gtk_button_get_label(self);
+    const char* ips = entry_get_text((GTK_ENTRY(data)));
+
+    GtkWidget* window = gtk_widget_get_ancestor(GTK_WIDGET(data), GTK_TYPE_WINDOW);
+
+    if (!strcmp(label, "whitelist")) {
+        ipt_whitelist_ips(ips);
+    }else{
+        ipt_blacklist_ips(ips);
+    }
+
+    ui_load_rules();
+    gtk_window_destroy(GTK_WINDOW(window));
+}
+
+void bulk_insert_ip(){
+    GtkWidget* window = gtk_window_new();
+    gtk_window_set_resizable(GTK_WINDOW(window), false);
+    gtk_window_set_default_size(GTK_WINDOW(window), INSERT_IP_POPUP_WIDTH, INSERT_IP_POPUP_HEIGHT);
+
+    GtkWidget *root_box, *input_box, *button_box;
+    GtkWidget *e_entry, *btn_blacklist, *btn_whitelist;
+    GtkEntryBuffer* e_buffer;
+
+    root_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_widget_set_hexpand(rootBox, TRUE);
+    gtk_widget_add_css_class(window, "root");
+    gtk_window_set_child(GTK_WINDOW(window), root_box);
+
+    input_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
+    gtk_widget_add_css_class(input_box, "popup-input-box");
+
+    button_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
+    gtk_widget_add_css_class(button_box, "popup-input-box");
+    gtk_widget_set_halign(button_box, GTK_ALIGN_END);
+
+    e_buffer = gtk_entry_buffer_new(NULL, -1);
+    e_entry = gtk_entry_new_with_buffer(e_buffer);
+    gtk_widget_add_css_class(e_entry, "input-widget");
+    gtk_widget_set_hexpand(e_entry, TRUE);
+
+    btn_blacklist = gtk_button_new_with_label("blacklist");
+    btn_whitelist = gtk_button_new_with_label("whitelist");
+    g_signal_connect(GTK_BUTTON(btn_blacklist), "clicked", G_CALLBACK(query_insert_ips), e_entry);
+    g_signal_connect(GTK_BUTTON(btn_whitelist), "clicked", G_CALLBACK(query_insert_ips), e_entry);
+
+    box_append(root_box, input_box);
+    box_append(root_box, button_box);
+
+    box_append(input_box, e_entry);
+
+    box_append(button_box, btn_blacklist);
+    box_append(button_box, btn_whitelist);
+
+    gtk_window_present(GTK_WINDOW(window));
+}
+
+
 void populate_bottom_panel(){
     // Buttons
     GtkWidget *panel = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
@@ -318,12 +379,15 @@ void populate_bottom_panel(){
 
     GtkWidget *w_add_rule = gtk_button_new_with_label("Add Rule +");
     GtkWidget *w_refresh = gtk_button_new_with_label("Refresh 🗘");
+    GtkWidget *w_bulk_ip = gtk_button_new_with_label("Blacklist/Whitelist IPs");
     
     g_signal_connect(GTK_BUTTON(w_refresh), "clicked", G_CALLBACK(ui_load_rules), NULL);
     g_signal_connect(GTK_BUTTON(w_add_rule), "clicked", G_CALLBACK(popup_add_rule), NULL);
+    g_signal_connect(GTK_BUTTON(w_bulk_ip), "clicked", G_CALLBACK(bulk_insert_ip), NULL);
 
     box_append(panel, w_add_rule);
     box_append(panel, w_refresh);
+    box_append(panel, w_bulk_ip);
 
     root_append(panel);
 }
