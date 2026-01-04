@@ -549,4 +549,17 @@ void ipt_replace_rule(int num, const char* src, const char* dst,
 
     free(num_arg);
     if (sport_arg) free(sport_arg);
-    if (dport_arg) free(dport_arg);}
+    if (dport_arg) free(dport_arg);
+}
+
+/*
+ * Reorders the rules to match the ordering in given rules.
+ * Rules are re-ordered as they appear in given rules list, `num` field is ignored.
+ */
+void ipt_reorder(const Rules* rules){
+    Rule rule = {0};
+    for (size_t i = 0; i < rules->count; ++i) {
+        rule = rules->items[i];
+        ipt_replace_rule(i+1, rule.src, rule.dst, rule.prot, rule.sport, rule.dport, rule.target);
+    }
+}

@@ -50,11 +50,25 @@ typedef struct{
         da.items[da.count++] = x;\
     }while(0)
 
+// If dst.count = 0, dumps src to dst.
+#define da_dump(dst, src)\
+    do{\
+        if (dst.count <= 0) {\
+            dst.capacity = src.capacity;\
+            dst.count = src.count;\
+            dst.items = malloc(src.capacity*sizeof(*(src.items)));\
+            dst.items = memcpy(dst.items, src.items, src.count*sizeof(*(src.items)));\
+        }\
+    }while(0)
+
 #define da_free(da)\
     do{\
         free(da.items);\
     }while(0)\
 
+
+void print_rule(Rule rule);
+void print_rules(const Rules* rules);
 
 int parse_rules_from_file(char* filename, Rules* rules);
 void str_trim(char* str);
@@ -71,7 +85,6 @@ void ipt_delete_rule(int num);
 void ipt_replace_rule(int num, const char* src, const char* dst,
         const char* prot, int sport, int dport, const char* target);
 
-void print_rule(Rule rule);
-void print_rules(const Rules* rules);
+void ipt_reorder(const Rules* dst);
 
 #endif /* ifndef IPT_H */

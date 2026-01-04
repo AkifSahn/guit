@@ -458,6 +458,21 @@ void bulk_insert_ip(){
     gtk_window_present(GTK_WINDOW(window));
 }
 
+int compar_rules_by_pkts(const void *a, const void *b){
+    return ((Rule*)b)->pkts - ((Rule*)a)->pkts;
+}
+
+void on_reorder_rules_clicked(GtkButton* self, void* data){
+    Rules _rules = {0};
+    da_dump(_rules, (state.rules));
+
+    qsort(_rules.items, _rules.count, sizeof(Rule), compar_rules_by_pkts);
+    ipt_reorder(&_rules);
+    ui_load_rules();
+
+    da_free(_rules);
+    return;
+}
 
 void populate_bottom_panel(){
     // Buttons
@@ -467,14 +482,17 @@ void populate_bottom_panel(){
     GtkWidget *w_add_rule = gtk_button_new_with_label("Add Rule +");
     GtkWidget *w_refresh = gtk_button_new_with_label("Refresh 🗘");
     GtkWidget *w_bulk_ip = gtk_button_new_with_label("Blacklist/Whitelist IPs");
+    GtkWidget *w_reorder_rules = gtk_button_new_with_label("Reorder Rules");
     
     g_signal_connect(GTK_BUTTON(w_refresh), "clicked", G_CALLBACK(ui_load_rules), NULL);
     g_signal_connect(GTK_BUTTON(w_add_rule), "clicked", G_CALLBACK(on_add_rule_clicked), NULL);
     g_signal_connect(GTK_BUTTON(w_bulk_ip), "clicked", G_CALLBACK(bulk_insert_ip), NULL);
+    g_signal_connect(GTK_BUTTON(w_reorder_rules), "clicked", G_CALLBACK(on_reorder_rules_clicked), NULL);
 
     box_append(panel, w_add_rule);
     box_append(panel, w_refresh);
     box_append(panel, w_bulk_ip);
+    box_append(panel, w_reorder_rules);
 
     root_append(state, panel);
 }
