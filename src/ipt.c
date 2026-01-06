@@ -218,7 +218,7 @@ static int parse_rule_from_line(const char* line, Rules* rules){
             rule.dst = strdup(token);
             break;
         case TOKEN_MODULE:
-            if (strcmp(token, "tcp")) {
+            if (! (!strcmp(token, "tcp") || !strcmp(token, "udp"))) {
                 i = num_tokens;
             }
             break;
